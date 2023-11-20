@@ -1,0 +1,6 @@
+logs/*
+MPIIGaze/
+*.pyc
+*.pth
+*.tflite
+eye_tracking_copy.py

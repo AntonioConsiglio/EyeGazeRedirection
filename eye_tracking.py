@@ -7,6 +7,7 @@ face_mesh = mp_facemash.FaceMesh()
 
 # points_vector = [243,130,359,463,10,331,102,1,291,61,6,168,164] #,0
 points_vector = [[225,221,128,31],[441,445,261,453]] #,0
+points_vector = [33,160,158,133,153,144]
 
 def get_max_min(list):
     return max(list),min(list)

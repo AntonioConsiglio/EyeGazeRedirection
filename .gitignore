@@ -4,3 +4,5 @@ MPIIGaze/
 *.pth
 *.tflite
 eye_tracking_copy.py
+prova.py
+irirs.py

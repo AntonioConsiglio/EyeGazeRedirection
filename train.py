@@ -9,7 +9,7 @@ from datetime import datetime
 from torch.optim.lr_scheduler import LambdaLR
 
 BATCH_SIZE = 16
-BETA1 = 0.9
+BETA1 = 0.5
 BETA2 = 0.999
 LR = 5e-04
 EPOCHS = 300

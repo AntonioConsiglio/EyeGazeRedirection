@@ -148,12 +148,25 @@ class GazeCorrection(nn.Module):
                     # Compute losses
                     recon_loss = self.nloss1(x_recon, real_images)
                     c_loss, s_loss = self.feat_loss(x_g, target_images)
-                    d_loss, g_loss, reg_loss_d, reg_loss_g, gp = self.adv_loss(real_images, x_g,r_angles,t_angles)
+                    d_loss, g_loss, reg_loss_d, reg_loss_g = self.adv_loss(real_images, x_g,r_angles,t_angles)
 
                     # Overall loss
                     total_g_loss = g_loss + 5.0 * reg_loss_g + 50.0 * recon_loss + 100.0 * s_loss + 100.0 * c_loss
                     total_d_loss = d_loss + 5.0 * reg_loss_d
 
+                    # Backward pass
+                    total_g_loss.backward(retain_graph = True)
+                    total_d_loss.backward()
+                    
+
+                    # Update weights
+                    for key,opt in optimizers.items():
+                        if key == "d":
+                            opt.step()
+                        elif key == "g" and it % 5 == 0:
+                            opt.step()
+                            opt.zero_grad()
+                    
                     # summ overall loss
                     average_total_g_loss += total_g_loss.item()
                     average_total_d_loss += total_d_loss.item()
@@ -163,18 +176,6 @@ class GazeCorrection(nn.Module):
                     averate_style_loss += s_loss.item()
                     average_content_loss += c_loss.item()
                     average_reg_loss_g += reg_loss_g.item()
-
-                    # Backward pass
-                    total_g_loss.backward(retain_graph=True)
-                    total_d_loss.backward()
-
-                    # Update weights
-                    for key,opt in optimizers.items():
-                        if key == "d":
-                            opt.step()
-                        elif key == "g" and it % 5 == 0:
-                            opt.step()
-                            opt.zero_grad()
                     
                     if it == total_it//2:
                         self._write_example_result(summary_writer,x_g.detach(),x_recon.detach(),real_images.detach(),
@@ -327,15 +328,16 @@ class GazeCorrection(nn.Module):
 
         # Forward pass through the discriminator for real and fake images
         gan_real, reg_real = self.discriminator(real_images)
-        gan_fake, reg_fake = self.discriminator(fake_images)  # Detach to avoid backpropagating through the generator
+        gan_fake, reg_fake = self.discriminator(fake_images.detach())  # Detach to avoid backpropagating through the generator
 
         # Compute gradient penalty
         eps = torch.rand(real_images.size(0), 1, 1, 1,device = self.device)
-        interpolated = eps * real_images + (1. - eps) * fake_images
-      
+        interpolated = eps * real_images + (1. - eps) * fake_images.detach()
+        interpolated.requires_grad = True
+
         gan_inter, _ = self.discriminator(interpolated)
-        grad = torch.autograd.grad(outputs=gan_inter, inputs=interpolated, grad_outputs=torch.ones(gan_inter.size(),device = self.device),
-                                   create_graph=True, retain_graph=True)[0]
+        grad = torch.autograd.grad(outputs=gan_inter, inputs=interpolated, grad_outputs=torch.ones_like(gan_inter),
+                                   create_graph=True)[0]
         
         slopes = torch.sqrt(torch.sum(grad**2, dim=[1, 2, 3]))
         gp = torch.mean((slopes - 1.)**2) # gradient penalty
@@ -346,7 +348,7 @@ class GazeCorrection(nn.Module):
         reg_loss_d = self.deglossmls(reg_real, start_angle) #MSELoss
         reg_loss_g = self.reglossmls(reg_fake, target_angle) #MSELoss
 
-        return d_loss, g_loss, reg_loss_d, reg_loss_g, gp
+        return d_loss, g_loss, reg_loss_d, reg_loss_g
 
     
 
